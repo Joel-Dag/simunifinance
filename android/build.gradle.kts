@@ -1,3 +1,6 @@
+import com.android.build.api.dsl.ApplicationExtension
+import com.android.build.api.dsl.LibraryExtension
+
 // Top-level build file for Android
 allprojects {
     repositories {
@@ -13,11 +16,14 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(name)
     layout.buildDirectory.value(newSubprojectBuildDir)
     
-    evaluationDependsOn(":app")
+    // SAFEGUARD: Only force evaluation of ':app' if we aren't currently configuring it
+    if (project.name != "app") {
+        evaluationDependsOn(":app")
+    }
 
     // 1. Fix Missing Namespaces dynamically
     plugins.withId("com.android.library") {
-        extensions.configure<com.android.build.gradle.LibraryExtension> {
+        extensions.configure<LibraryExtension> {
             if (namespace == null) {
                 namespace = "com.example.${project.name}"
             }
@@ -25,7 +31,7 @@ subprojects {
     }
 
     plugins.withId("com.android.application") {
-        extensions.configure<com.android.build.gradle.AppExtension> {
+        extensions.configure<ApplicationExtension> {
             if (namespace == null) {
                 namespace = "com.example.${project.name}"
             }
@@ -47,6 +53,22 @@ subprojects {
                         logger.lifecycle("Successfully stripped forbidden package attribute from: ${manifestFile.path}")
                     }
                 }
+            }
+        }
+    }
+
+    // 3. Force compileSdk to 34 for all subproject plugins (Fixes CheckAarMetadata errors)
+    afterEvaluate {
+        val compileSdkVersionValue = 34
+        
+        plugins.withId("com.android.library") {
+            extensions.configure<LibraryExtension> {
+                compileSdk = compileSdkVersionValue
+            }
+        }
+        plugins.withId("com.android.application") {
+            extensions.configure<ApplicationExtension> {
+                compileSdk = compileSdkVersionValue
             }
         }
     }
